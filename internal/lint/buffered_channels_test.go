@@ -1,4 +1,4 @@
-package lint
+package tests
 
 import (
 	"go/ast"
@@ -6,56 +6,35 @@ import (
 	"go/token"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
-// TestNoBufferedChannels ensures that no buffered channels are used in the codebase.
-// Buffered channels are discouraged because they can hide deadlocks and make it harder
-// to reason about concurrent behavior. Unbuffered channels provide better synchronization
-// guarantees and make the flow of data more explicit.
-//
-// This test performs static analysis on the source code by:
-// 1. Parsing the specified Go files into Abstract Syntax Trees (AST)
-// 2. Walking through each AST to find channel creation expressions
-// 3. Checking if any channels are created with a buffer size
 func TestNoBufferedChannels(t *testing.T) {
-	// List of files to check for buffered channels
 	filesToCheck := []string{
 		"../filecrawler/crawler.go",
 		"../workerpool/pool.go",
 	}
 
 	for _, relPath := range filesToCheck {
-		// Get absolute path
 		absPath, err := filepath.Abs(relPath)
-		if err != nil {
-			t.Fatalf("Failed to get absolute path for %s: %v", relPath, err)
-		}
+		require.NoError(t, err)
 
 		fset := token.NewFileSet()
 		node, err := parser.ParseFile(fset, absPath, nil, parser.AllErrors)
-		if err != nil {
-			t.Fatalf("Failed to parse file %s: %v", absPath, err)
-		}
+		require.NoError(t, err)
 
-		// Walk through the AST looking for channel declarations
 		ast.Inspect(node, func(n ast.Node) bool {
 			if makeExpr, ok := n.(*ast.CallExpr); ok {
-				// Check if it's a make() call
 				if ident, ok := makeExpr.Fun.(*ast.Ident); ok && ident.Name == "make" {
-					// Check if it's making a channel
-					if len(makeExpr.Args) >= 1 {
-						if _, ok := makeExpr.Args[0].(*ast.ChanType); ok {
-							// If there's more than one argument, it's a buffered channel
-							// according to https://go.dev/ref/spec#Making_slices_maps_and_channels
-							// if there is a second argument, it must be the size.
-							if len(makeExpr.Args) > 1 {
-								t.Errorf("File %s contains a buffered channel at position %v",
-									relPath, fset.Position(makeExpr.Pos()))
-							}
-						}
+					if _, ok := makeExpr.Args[0].(*ast.ChanType); ok {
+						require.Equal(t, 1, len(makeExpr.Args),
+							"File %s contains a buffered channel at position %v",
+							relPath, fset.Position(makeExpr.Pos()))
 					}
 				}
 			}
+
 			return true
 		})
 	}

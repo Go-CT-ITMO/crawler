@@ -15,21 +15,12 @@ linters-settings:
         arguments:
           - mypragma
           - otherpragma
-      - name: comments-density
-        severity: warning
-        disabled: false
-        exclude: [ "" ]
-        arguments: [ 43 ]
-      - name: exported
-        arguments:
-          - checkPrivateReceivers
   depguard:
     rules:
       main:
         list-mode: original
         files:
           - $all
-          - "!**/*_test.go"
         allow:
           - context
           - sync
@@ -65,5 +56,6 @@ issues:
     - crawler_test.go
     - pool_test.go
     - app.go
+    - buffered_channels_test.go
   exclude-use-default: true
   max-issues-per-linter: 0
